@@ -4,16 +4,15 @@ import { Days } from '../src/Days';
 
 describe('should calculate the payment for an on call user', () => {
     
-    const onCallRates: Record<Days, number> = {
-        [Days.SUNDAY]: 75,
-        [Days.MONDAY]: 50,
-        [Days.TUESDAY]: 50,
-        [Days.WEDNESDAY]: 50,
-        [Days.THURSDAY]: 50,
-        [Days.FRIDAY]: 75,
-        [Days.SATURDAY]: 75,
-    };
-
+    const onCallRates: number[] = [
+        75,
+        50,
+        50,
+        50,
+        50,
+        75,
+        75
+    ];
     test('- when person continues to be on-call from end of Month to 12th of subsequent month', () => {
         const onCallUser = {
             id: '1',
