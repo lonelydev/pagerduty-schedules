@@ -32,6 +32,6 @@ export class OnCallUser {
     }
 
     public getTotalOohWeekendDays(): number {
-        return this._onCallPeriods.reduce((acc, ocp) => acc + ocp.numberOfOohWeekendDays, 0);
+        return this._onCallPeriods.reduce((acc, ocp) => acc + ocp.numberOfOohWeekends, 0);
     }
 }

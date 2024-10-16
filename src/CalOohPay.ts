@@ -9,33 +9,11 @@ import { FinalSchedule } from './FinalSchedule';
 import { OnCallPaymentsCalculator } from './OnCallPaymentsCalculator';
 import { ScheduleEntry } from './ScheduleEntry';
 import { CommandLineOptions } from './CommandLineOptions.js';
+import { Environment, sanitiseEnvVariable } from './EnvironmentController.js';
+import { toLocaTzIsoStringWithOffset } from './DateUtilities.js';
 
 dotenv.config();
 
-interface Environment {
-    API_TOKEN: string;
-}
-
-function sanitiseEnvVariable(envVars: NodeJS.ProcessEnv): Environment {
-    if (!envVars.API_TOKEN) {
-        throw new Error("API_TOKEN not defined");
-    }
-    return {
-        API_TOKEN: envVars.API_TOKEN,
-    };
-}
-
-function toLocalIsoStringWithOffset(date: Date): string {
-    var timezoneOffsetInMilliseconds = date.getTimezoneOffset() * 60000;
-    var localISOTime = (new Date(date.getTime() - timezoneOffsetInMilliseconds)).toISOString().slice(0, -5);
-    let timezoneOffsetInHours = - (timezoneOffsetInMilliseconds / 3600000);
-    let localISOTimeWithOffset =
-        localISOTime +
-        (timezoneOffsetInHours >= 0 ? '+' : '-') +
-        (Math.abs(timezoneOffsetInHours) < 10 ? '0' : '') +
-        timezoneOffsetInHours + ':00';
-    return localISOTimeWithOffset;
-}
 const sanitisedEnvVars: Environment = sanitiseEnvVariable(process.env);
 
 const yargsInstance = yargs(hideBin(process.argv));
@@ -67,7 +45,7 @@ const argv: CommandLineOptions = yargsInstance
     })
     .default('s', function firstDayOfPreviousMonth(): string {
         let today = new Date();
-        return toLocalIsoStringWithOffset(new Date(new Date(today.getFullYear(), (today.getMonth() - 1), 1)));
+        return toLocaTzIsoStringWithOffset(new Date(new Date(today.getFullYear(), (today.getMonth() - 1), 1)));
     }, 'the first day of the previous month')
     .option('until', {
         type: 'string',
@@ -77,7 +55,7 @@ const argv: CommandLineOptions = yargsInstance
     })
     .default('u', function lastDayOfPreviousMonth(): string {
         let today = new Date();
-        return toLocalIsoStringWithOffset(new Date(
+        return toLocaTzIsoStringWithOffset(new Date(
             new Date(
                 today.getFullYear(),
                 today.getMonth(),
@@ -147,6 +125,7 @@ function extractOnCallUsersFromFinalSchedule(finalSchedule: FinalSchedule): Reco
 }
 
 function calOohPay(cliOptions: CommandLineOptions) {
+    console.table(cliOptions);
     const pagerDutyApi = api({ token: sanitisedEnvVars.API_TOKEN });
     for (let rotaId of cliOptions.rotaIds.split(',')) {
         pagerDutyApi
@@ -184,4 +163,19 @@ function calOohPay(cliOptions: CommandLineOptions) {
                 }
             );
     }
+}
+
+function sanitiseInputDates(since: string, until: string): [string, string] {
+    let sinceDate = new Date(since);
+    let untilDate = new Date(until);
+    // if sinceDate has a time component, set it to 00:00:00
+    sinceDate.setHours(0, 0, 0, 0);
+    //if untilDate has a time component, set it to 23:59:59
+    untilDate.setHours(23, 59, 59, 999); 
+    if (sinceDate > untilDate) {
+        throw new Error("since date cannot be greater than until date");
+    }
+    let sinceString = toLocaTzIsoStringWithOffset(sinceDate);
+    let untilString = toLocaTzIsoStringWithOffset(untilDate);
+    return [sinceString, untilString];
 }

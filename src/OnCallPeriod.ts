@@ -4,7 +4,7 @@ export class OnCallPeriod {
     readonly until: Date;
 
     private _numberOfOohWeekDays: number = 0;
-    private _numberOfOohWeekendDays: number = 0;
+    private _numberOfOohWeekends: number = 0;
 
     constructor(s: Date, u: Date) {
         this.since = new Date(s);
@@ -19,7 +19,7 @@ export class OnCallPeriod {
                 if (OnCallPeriod.isWeekDay(curDate.getDay())) {
                     this._numberOfOohWeekDays++;
                 } else {
-                    this._numberOfOohWeekendDays++;
+                    this._numberOfOohWeekends++;
                 }
             }
             curDate.setDate(curDate.getDate() + 1);
@@ -30,10 +30,16 @@ export class OnCallPeriod {
         return this._numberOfOohWeekDays;
     }
 
-    public get numberOfOohWeekendDays(): number {
-        return this._numberOfOohWeekendDays;
+    public get numberOfOohWeekends(): number {
+        return this._numberOfOohWeekends;
     }
 
+    /**
+     * Determines if the given day number corresponds to a weekday.
+     *
+     * @param dayNum - The number representing the day of the week (0 for Sunday, 1 for Monday, ..., 6 for Saturday).
+     * @returns `true` if the day number corresponds to a weekday (Monday to Thursday), otherwise `false`.
+     */
     private static isWeekDay(dayNum: number): boolean {
         return dayNum > 0 && dayNum < 5;
     }
@@ -46,10 +52,6 @@ export class OnCallPeriod {
      * @returns true if the person was on call OOH, false otherwise
      */
     private static wasPersonOnCallOOH(since: Date, until: Date): boolean {
-        /**
-         * if dateToCheck in the evening after 6pm and onCallUntilDate is at least 12 hours 
-         * longer than dateToCheck, then the person was on call OOH
-         */
         return (OnCallPeriod.doesShiftSpanEveningTillNextDay(since, until) &&
             OnCallPeriod.isShiftLongerThan6Hours(since, until));
     }
@@ -78,15 +80,9 @@ export class OnCallPeriod {
         return (since.getDate() !== until.getDate());
     }
 
-    private static convertTZ(date: Date, timeZoneId: string): Date {
-        return new Date(
-            (typeof date === "string" ? new Date(date) : date)
-            .toLocaleString("en-GB", {timeZone: timeZoneId}));   
-    }
-
     toString() {
         console.log("On call period from %s to %s", this.since, this.until);
         console.log("Number of OOH Weekdays (Mon-Thu): %d", this.numberOfOOhWeekDays);
-        console.log("Number of OOH Weekends (Fri-Sun): %d", this.numberOfOohWeekendDays);
+        console.log("Number of OOH Weekends (Fri-Sun): %d", this.numberOfOohWeekends);
     }
 }
