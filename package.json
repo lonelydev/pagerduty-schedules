@@ -22,6 +22,7 @@
     "@commitlint/config-conventional": "^19.5.0",
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.12",
+    "@types/luxon": "^3.4.2",
     "@types/node": "^22.7.5",
     "@types/yargs": "^17.0.33",
     "husky": "^9.1.6",
@@ -32,6 +33,7 @@
   "dependencies": {
     "@pagerduty/pdjs": "^2.2.4",
     "dotenv": "^16.4.5",
+    "luxon": "^3.5.0",
     "yargs": "^17.7.2"
   }
 }

@@ -9,33 +9,12 @@ import { FinalSchedule } from './FinalSchedule';
 import { OnCallPaymentsCalculator } from './OnCallPaymentsCalculator';
 import { ScheduleEntry } from './ScheduleEntry';
 import { CommandLineOptions } from './CommandLineOptions.js';
+import { Environment, sanitiseEnvVariable } from './EnvironmentController.js';
+import { toLocaTzIsoStringWithOffset, coerceSince, coerceUntil} from './DateUtilities.js';
+import { DateTime } from "luxon";
 
 dotenv.config();
 
-interface Environment {
-    API_TOKEN: string;
-}
-
-function sanitiseEnvVariable(envVars: NodeJS.ProcessEnv): Environment {
-    if (!envVars.API_TOKEN) {
-        throw new Error("API_TOKEN not defined");
-    }
-    return {
-        API_TOKEN: envVars.API_TOKEN,
-    };
-}
-
-function toLocalIsoStringWithOffset(date: Date): string {
-    var timezoneOffsetInMilliseconds = date.getTimezoneOffset() * 60000;
-    var localISOTime = (new Date(date.getTime() - timezoneOffsetInMilliseconds)).toISOString().slice(0, -5);
-    let timezoneOffsetInHours = - (timezoneOffsetInMilliseconds / 3600000);
-    let localISOTimeWithOffset =
-        localISOTime +
-        (timezoneOffsetInHours >= 0 ? '+' : '-') +
-        (Math.abs(timezoneOffsetInHours) < 10 ? '0' : '') +
-        timezoneOffsetInHours + ':00';
-    return localISOTimeWithOffset;
-}
 const sanitisedEnvVars: Environment = sanitiseEnvVariable(process.env);
 
 const yargsInstance = yargs(hideBin(process.argv));
@@ -54,7 +33,8 @@ const argv: CommandLineOptions = yargsInstance
         type: 'string',
         demandOption: false,
         alias: 't',
-        description: 'the timezone id of the schedule. Refer https://developer.pagerduty.com/docs/1afe25e9c94cb-types#time-zone for details.'
+        description: 'the timezone id of the schedule. Refer https://developer.pagerduty.com/docs/1afe25e9c94cb-types#time-zone for details.\n' + 
+        'By default, this takes your local Timezone returned by the runtime environment',
     })
     .default('t', function defaultTimeZoneId(): string {
         return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -62,22 +42,24 @@ const argv: CommandLineOptions = yargsInstance
     .option('since', {
         type: 'string',
         alias: 's',
-        description: 'start of the schedule period (inclusive) in https://en.wikipedia.org/wiki/ISO_8601 format',
-        example: '2021-08-01T00:00:00+01:00'
+        description: 'start of the schedule period (inclusive).\n' +
+        'You can choose to specify this in YYYY-MM-DD format and the default time string "00:00:00" will be appended to it by the program.',
+        example: '2021-08-01'
     })
     .default('s', function firstDayOfPreviousMonth(): string {
         let today = new Date();
-        return toLocalIsoStringWithOffset(new Date(new Date(today.getFullYear(), (today.getMonth() - 1), 1)));
+        return toLocaTzIsoStringWithOffset(new Date(new Date(today.getFullYear(), (today.getMonth() - 1), 1)));
     }, 'the first day of the previous month')
     .option('until', {
         type: 'string',
         alias: 'u',
-        description: 'end of the schedule period (inclusive) in https://en.wikipedia.org/wiki/ISO_8601 format',
-        example: '2021-08-01T00:00:00+01:00'
+        description: 'end of the schedule period (inclusive) in https://en.wikipedia.org/wiki/ISO_8601 format' +
+        'You can choose to specify this in YYYY-MM-DD format. The default time string "23:59:59" will be appended to it by the program.',
+        example: '2021-08-31'
     })
     .default('u', function lastDayOfPreviousMonth(): string {
         let today = new Date();
-        return toLocalIsoStringWithOffset(new Date(
+        return toLocaTzIsoStringWithOffset(new Date(
             new Date(
                 today.getFullYear(),
                 today.getMonth(),
@@ -106,8 +88,9 @@ const argv: CommandLineOptions = yargsInstance
     })
     .example([
         ['caloohpay -r "PQRSTUV,PSTUVQR,PTUVSQR"', 
-            'Calculates on-call payments for the comma separated pagerduty scheduleIds. The default timezone is the local timezone. The default period is the previous month.'],
-        ['caloohpay -r "PQRSTUV" -s "2021-08-01T00:00:00+01:00" -u "2021-09-01T10:00:00+01:00"', 
+            'Calculates on-call payments for the comma separated pagerduty scheduleIds.\n'+ 
+            'The default timezone is the local timezone. The default period is the previous month.'],
+        ['caloohpay -r "PQRSTUV" -s "2021-08-01" -u "2021-09-01"', 
             'Calculates on-call payments for the schedules with the given scheduleIds for the month of August 2021.'],
     ])
     .help()
@@ -118,8 +101,14 @@ const argv: CommandLineOptions = yargsInstance
         if (argv.until && !Date.parse(argv.until)) {
             throw new Error("Invalid date format for until");
         }
+        if (argv.since && argv.until && DateTime.fromISO(argv.since) > DateTime.fromISO(argv.until)) {
+            throw new Error("Since cannot be greater than Until");
+        }
         return true;
-    }).argv as CommandLineOptions;
+    })
+    .coerce('since', coerceSince)
+    .coerce('until', coerceUntil)
+    .argv as CommandLineOptions;
 
 calOohPay(argv);
 
@@ -147,6 +136,7 @@ function extractOnCallUsersFromFinalSchedule(finalSchedule: FinalSchedule): Reco
 }
 
 function calOohPay(cliOptions: CommandLineOptions) {
+    console.table(cliOptions);
     const pagerDutyApi = api({ token: sanitisedEnvVars.API_TOKEN });
     for (let rotaId of cliOptions.rotaIds.split(',')) {
         pagerDutyApi
@@ -185,3 +175,4 @@ function calOohPay(cliOptions: CommandLineOptions) {
             );
     }
 }
+
